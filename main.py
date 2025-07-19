@@ -4,16 +4,17 @@ import pandas as pd
 import time
 import os
 import smtplib
+import json
 from datetime import datetime
 from threading import Thread
 
 class NetworkMonitor:
     def __init__(self):
-        self.log_file = "network_log.csv"
+        self.log_file = "network_log.json"  # Changed to JSON
         self.servers = ["google.com", "8.8.8.8", "192.168.1.1"]
         self.email_config = {
             "sender": "your_email@gmail.com",
-            "password": "your_app_password",  # Use an app-specific password
+            "password": "your_app_password",
             "receiver": "admin@example.com"
         }
 
@@ -36,11 +37,21 @@ class NetworkMonitor:
             return None
 
     def log_data(self, data):
-        df = pd.DataFrame([data])
-        if not os.path.exists(self.log_file):
-            df.to_csv(self.log_file, index=False)
-        else:
-            df.to_csv(self.log_file, mode='a', header=False, index=False)
+        """Save data to JSON file, appending to existing array"""
+        try:
+            if os.path.exists(self.log_file):
+                with open(self.log_file, 'r') as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = []
+            
+            existing_data.append(data)
+            
+            with open(self.log_file, 'w') as f:
+                json.dump(existing_data, f, indent=2)
+                
+        except Exception as e:
+            print(f"Error saving JSON: {e}")
 
     def send_alert(self, message):
         try:
@@ -59,11 +70,15 @@ class NetworkMonitor:
 
     def analyze_logs(self):
         if os.path.exists(self.log_file):
-            df = pd.read_csv(self.log_file)
-            print("\n--- Network Report ---")
-            print(f"Total entries: {len(df)}")
-            print(f"Average download: {df['Download_Mbps'].mean():.2f} Mbps")
-            print(f"Last outage: {df[df['Ping_google.com'] == 'Failed'].iloc[-1]['Timestamp'] if 'Failed' in df['Ping_google.com'].values else 'None'}")
+            with open(self.log_file, 'r') as f:
+                data = json.load(f)
+                df = pd.DataFrame(data)
+                print("\n--- Network Report ---")
+                print(f"Total entries: {len(df)}")
+                print(f"Average download: {df['Download_Mbps'].mean():.2f} Mbps" if 'Download_Mbps' in df.columns else "No speed tests recorded")
+                if 'Ping_google.com' in df.columns:
+                    failed_pings = df[df['Ping_google.com'] == 'Failed']
+                    print(f"Google ping failed {len(failed_pings)} times")
         else:
             print("No log file found.")
 
@@ -71,25 +86,24 @@ class NetworkMonitor:
         print("Starting Network Monitor (Ctrl+C to stop)...")
         try:
             while True:
-                results = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                results = {
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    **{f"Ping_{server}": self.ping_test(server) for server in self.servers}
+                }
                 
-                # Ping tests
-                for server in self.servers:
-                    results[f"Ping_{server}"] = self.ping_test(server)
-                
-                # Speed test (every 10 minutes)
                 if int(datetime.now().strftime("%M")) % 10 == 0:
                     speed_data = self.speed_test()
                     if speed_data:
-                        results["Download_Mbps"] = round(speed_data["download"] / 1_000_000, 2)
-                        results["Upload_Mbps"] = round(speed_data["upload"] / 1_000_000, 2)
+                        results.update({
+                            "Download_Mbps": round(speed_data["download"] / 1_000_000, 2),
+                            "Upload_Mbps": round(speed_data["upload"] / 1_000_000, 2)
+                        })
                 
                 self.log_data(results)
                 print(f"Logged: {results}")
 
-                # Alert on failure
                 if "Failed" in results.values():
-                    self.send_alert(f"Network failure detected at {results['Timestamp']}")
+                    self.send_alert(f"Network failure at {results['Timestamp']}")
 
                 time.sleep(interval_minutes * 60)
 
