@@ -8,6 +8,26 @@ A Python tool to monitor network health, test speeds, and alert on failures. Per
 - 🔔 Email alerts when connections fail
 - 📈 Automatic log analysis with Pandas
 
+
+## Project Structure
+```bash
+network_monitor/
+│
+├── main.py                 # Entry point
+├── config/
+│   ├── __init__.py
+│   └── settings.py         # Configuration constants
+├── modules/
+│   ├── __init__.py
+│   ├── file_handler.py     # JSON/CSV operations
+│   ├── network_tests.py    # Ping/Speed tests
+│   ├── alert_system.py     # Email alerts
+│   └── analysis.py         # Data analysis
+└── utils/
+    ├── __init__.py
+    └── helpers.py          # Helper functions
+```
+
 ## Quick Start
 1. Install dependencies:
 ```bash
