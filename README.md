@@ -36,3 +36,5 @@ Alerts: Disable by commenting out send_alert() call
   "Upload_Mbps": 8.47
 }
 ```
+
+📝[License: MIT](/LICENSE)
